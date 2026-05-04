@@ -246,3 +246,137 @@ provider selection, model pick, memory setup, optional Honcho enrol,
 and tool-allow-list configuration. It is called from
 `hermes_cli/setup.py` (the `hermes setup` wizard) and on the very first
 `hermes` invocation in a fresh `~/.hermes`.
+
+## 8. SessionDB query patterns
+
+`SessionDB` exposes a small, focused API. The patterns most commonly
+used:
+
+```python
+# Read a session
+db.get_session(session_id) -> dict
+db.get_messages(session_id, limit=None, offset=0) -> list[dict]
+
+# Write
+sid = db.create_session(source="cli", model="anthropic:claude-opus-4-7",
+                         parent_session_id=None)
+db.persist_turn(sid, messages_added, usage_delta=None)
+db.update_session_meta(sid, title=..., ended_at=..., billing=...)
+
+# Search
+db.search(query, limit=50, source=None, since=None) -> list[dict]
+db.fts_search_cjk(query, limit=50) -> list[dict]   # trigram
+
+# Maintenance
+db.vacuum()
+db.rebuild_fts()
+```
+
+All methods open their own short cursor and commit before returning.
+Long transactions are intentionally absent — the agent loop is "many
+small writes", which suits SQLite's WAL.
+
+## 9. `state_meta` keys
+
+Some keys you will see in `state_meta`:
+
+| Key | Purpose |
+|-----|---------|
+| `last_curator_run` | ISO timestamp; read by curator inactivity check. |
+| `last_update_check` | ISO timestamp; read by `hermes update`. |
+| `last_setup_run` | First-run flag. |
+| `pinned_skills` | JSON array of skill names auto-loaded across sessions. |
+| `default_delivery_target` | `/sethome` value. |
+
+`state_meta` is intended for *small* values; anything larger should
+live in its own file or table.
+
+## 10. The compression summary template
+
+The exact `SUMMARY_PREFIX` (lightly paraphrased — see
+`agent/context_compressor.py:38-49`):
+
+```
+SUMMARY OF EARLIER CONVERSATION
+================================
+
+Resolved questions:
+- <bullet list>
+
+Pending questions:
+- <bullet list>
+
+Files touched:
+- <path: short note>
+
+Plan / next steps:
+- <bullet list>
+```
+
+Why these four sections:
+
+1. **Resolved** — facts the agent should treat as established.
+2. **Pending** — open threads that may require follow-up.
+3. **Files touched** — short audit trail so the model can re-read
+   any file via `read_file` if details are missing.
+4. **Plan / next steps** — preserves the medium-term plan across
+   compactions.
+
+The auxiliary client is instructed to keep this scaffolding even
+when there is nothing to put under a section ("- (none)" entries are
+preserved). This keeps successive compactions consistent.
+
+## 11. Curator + memory interplay
+
+The curator pulls signals from three sources:
+
+* `tools/skill_usage.py` — usage tracking for each skill.
+* `agent/insights.py` — cross-session patterns.
+* The active memory provider's transcript — the curator may decide
+  that a long-running pattern in memory should be canonicalised as a
+  skill.
+
+Curator output therefore can affect memory: a successful
+"consolidate" may produce a skill that supersedes a free-text memory
+entry, in which case the curator can ask the memory provider to
+remove the obsolete entry (`MemoryProvider.on_memory_write` hook).
+
+## 12. Session search internals
+
+The `session_search` tool uses both FTS5 tables:
+
+* The default tokeniser (Unicode61) handles word-boundary searches
+  for English / Romance / Cyrillic / Greek.
+* The trigram tokeniser handles substring searches for CJK and other
+  scripts where Unicode61 word boundaries are too coarse.
+
+Per-query routing:
+
+```python
+if any(ord(c) > 0x2E80 for c in query):   # CJK / Hangul
+    use messages_fts_trigram
+else:
+    use messages_fts
+```
+
+Both tables are kept in sync via SQLite triggers on `messages`
+(insert / update / delete). Rebuilding either table is `db.rebuild_fts()`.
+
+## 13. Token accounting
+
+Per-session totals live on the `sessions` row. Each `persist_turn`
+update also folds in:
+
+* `input_tokens`
+* `output_tokens`
+* `cache_read_tokens`
+* `cache_write_tokens`
+* `reasoning_tokens`
+
+These are fed by the transport's `extract_cache_stats()` method —
+adapters that don't report cache stats simply leave the cache columns
+at 0.
+
+`/usage` reads these aggregates plus `agent/usage_pricing.py` to show
+a per-session cost (status: actual / estimated / included / unknown).
+

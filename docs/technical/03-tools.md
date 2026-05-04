@@ -386,3 +386,51 @@ elapsed since the last run. It spawns a forked `AIAgent` to review,
 pin, archive, consolidate or patch the skills the user has been
 generating, and writes its state to
 `~/.hermes/skills/.curator_state`.
+
+## 6. Tool result lifecycle
+
+A tool call's result goes through several stages before the model sees
+it:
+
+1. **Handler return** — handler returns a JSON string.
+2. **Output truncation** — `tools/tool_output_limits.py` truncates
+   per-tool to `max_result_size_chars` (default 50 000).
+3. **Artifact storage** — large / binary results may be persisted to
+   `~/.hermes/cache/artifacts/<task_id>/` via
+   `tools/tool_result_storage.py`. The model sees a small handle
+   instead of the full content.
+4. **Schema sanitisation** — `tools/schema_sanitizer.py` strips any
+   surfaces that should not enter the conversation.
+5. **History append** — added to the message list as a `tool` role
+   message.
+6. **Persistence** — written to `SessionDB` via
+   `SessionDB.persist_turn` at the end of the turn.
+
+## 7. Tool concurrency model
+
+Tool calls are dispatched **serially** within a single agent turn —
+the model emits a tool_call, Hermes runs it, the result goes back, the
+next tool_call (if any) runs after. Parallel tool calls in providers
+that support them are still dispatched serially in v0.12.0; future
+versions may add parallel dispatch behind a config flag.
+
+The exception is `tools/delegate_tool.py`, which spawns a sub-agent
+that runs in its own loop. Multiple delegated sub-agents can run
+concurrently if the parent uses MoA / mixture-of-agents.
+
+## 8. Tool failure modes
+
+Tools fail in three structured ways:
+
+* **Recoverable** — return `{"success": False, "error": "..."}`. The
+  agent sees the error and can retry / adapt.
+* **Unrecoverable** — raise an exception. Hermes catches, logs,
+  returns `{"success": False, "error": "<exception class>: <msg>"}`,
+  and the model decides what to do.
+* **Hard fail** — raise `tools.interrupt.InterruptException`. The
+  agent loop terminates without further work.
+
+Convention: prefer the first form for anything the model could
+reasonably recover from. Reserve the second for genuine bugs and the
+third for explicit user cancellation.
+

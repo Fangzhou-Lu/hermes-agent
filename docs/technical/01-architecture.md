@@ -239,3 +239,136 @@ so that contributors do not need to touch the core loop:
 | **Plugin**    | Drop a Python package under `plugins/<name>/` with the plugin manifest | [02-modules.md](02-modules.md) |
 | **MCP server**| Configure in `~/.hermes/mcp_servers.yaml`; `tools/mcp_tool.py` exposes the calls | [03-tools.md](03-tools.md) |
 | **Cron job**  | `cron/jobs.py` definitions; delivered via gateway `delivery.py` | [04-gateway.md](04-gateway.md) |
+
+## 9. Lifecycles
+
+### Process lifecycle
+
+```
+hermes_cli.main:main()
+  ├─► _apply_profile_override()  ── before any state-touching imports
+  ├─► load .env                    via hermes_cli.env_loader
+  ├─► load config.yaml             via hermes_cli.config
+  ├─► setup_logging()
+  ├─► dispatch subcommand
+  │     ├── interactive REPL  →  HermesCLI(...)
+  │     ├── one-shot          →  hermes_cli.oneshot.run(...)
+  │     ├── gateway           →  gateway.run.GatewayRunner(...)
+  │     ├── batch             →  batch_runner.main(...)
+  │     ├── ACP / MCP         →  acp_adapter / mcp_serve
+  │     └── ...               →  one of ~30 hermes_cli/<sub>.py files
+  └─► clean shutdown          via atexit hooks (close DB, flush logs,
+                                kill background processes)
+```
+
+### Session lifecycle
+
+```
+session_id = uuid4()
+  ├── created_at   = now()
+  ├── source       = "cli" | "telegram" | "discord" | ...
+  ├── model        = "anthropic:claude-opus-4-7"
+  ├── parent_id    = None | <prev session id when branched/compressed>
+  ▼
+N turns of:
+  ├── pre-turn:  memory.queue_prefetch_all()
+  │              context_engine.should_compress_preflight()
+  ├── transport call(s) (with credential rotation on errors)
+  ├── tool call dispatch
+  ├── post-turn: memory.sync_all()
+  │              SessionDB.persist_turn()
+  ▼
+session ends when:
+  ├── /quit, gateway shutdown, or LRU eviction (1h idle)
+  ├── /reset — old session is closed; new session created
+  ├── /branch — new session created with parent_session_id
+  └── compression — new session created with parent_session_id
+```
+
+### Agent lifecycle within a turn
+
+```
+AIAgent.run_conversation(user_message)
+  ├── interrupt.check()
+  ├── messages.append({"role": "user", "content": user_message})
+  ├── for each iteration ≤ max_iterations:
+  │     ├── interrupt.check()
+  │     ├── transport.build_kwargs(messages, tools)
+  │     ├── stream_response = provider.complete(**kwargs)
+  │     ├── for chunk in stream_response:
+  │     │     ├── text_delta  → callback.on_text(chunk)
+  │     │     ├── tool_delta  → callback.on_tool_delta(chunk)
+  │     │     └── reasoning   → callback.on_reasoning(chunk)
+  │     ├── nr = transport.normalize_response(stream)
+  │     ├── if nr.tool_calls:
+  │     │     for tc in nr.tool_calls:
+  │     │         result = handle_function_call(tc)
+  │     │         messages.append(tool_result(tc, result))
+  │     │     continue
+  │     └── if nr.text:
+  │           messages.append(assistant(nr.text))
+  │           break
+  ├── memory.sync_all(messages)
+  ├── SessionDB.persist_turn()
+  └── return final_response
+```
+
+## 10. Cross-cutting concerns
+
+### Interrupts
+
+`tools/interrupt.py` is the central interrupt registry. The agent
+loop checks `interrupt.is_set()` at safe boundaries:
+
+* Before each provider call.
+* Before each tool dispatch.
+* Between streaming chunks.
+
+In the CLI, `Ctrl+C` raises a `KeyboardInterrupt` that the prompt-toolkit
+event loop translates into an interrupt. The TUI sends the interrupt
+via `tool.cancel` JSON-RPC. The gateway handles `/stop` by setting the
+flag.
+
+### Determinism
+
+The codebase is intentionally deterministic where it can be:
+
+* `hermes_time.now()` is stubbed in tests.
+* `os.environ` is normalised by `hermes_cli.env_loader.load_hermes_dotenv()`.
+* SQLite WAL gives serialisability per row.
+* The credential pool's randomised strategy uses a seeded PRNG when
+  testing.
+
+This makes test failures reproducible.
+
+### Idempotency
+
+Most operations are idempotent or close to it:
+
+* `SessionDB.persist_turn` — writes new rows; never modifies prior
+  rows.
+* `MemoryManager.sync_all` — providers decide whether to write.
+* `Curator.run` — backs up before any destructive change; safe to
+  retry.
+* `cron.scheduler.tick` — file lock prevents double-execution; jobs
+  may be retried by their natural schedule.
+
+This is crucial for crash recovery: a half-applied operation cannot
+corrupt state.
+
+### Cancellation safety
+
+Long-running tools must accept and respect cancellation. The pattern:
+
+```python
+def long_running_tool(args, **kw):
+    interrupt = kw.get("interrupt")
+    for chunk in produce_chunks():
+        if interrupt and interrupt.is_set():
+            raise InterruptException()
+        process(chunk)
+```
+
+Without this, `Ctrl+C` cannot abort a runaway tool. CI tests cover the
+common offenders (`terminal_tool`, `web_extract`, `browser`).
+

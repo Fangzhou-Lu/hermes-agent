@@ -9,15 +9,28 @@ plugin authors and anyone integrating with or extending the codebase.
 
 ## Table of Contents
 
-| Document | Topic |
-|----------|-------|
-| [01-architecture.md](01-architecture.md) | High-level architecture, agent loop, request lifecycle |
-| [02-modules.md](02-modules.md) | Module reference — every top-level package and file |
-| [03-tools.md](03-tools.md) | Tool registry, builtin tools, terminal backends |
-| [04-gateway.md](04-gateway.md) | Messaging gateway, platform adapters, sessions |
-| [05-state-and-memory.md](05-state-and-memory.md) | SQLite session store, memory, skills, context |
-| [06-providers.md](06-providers.md) | Provider transports, adapters, credentials, rate limits |
-| [07-developer-guide.md](07-developer-guide.md) | Build, test, contribute, release |
+| # | Document | Topic |
+|---|----------|-------|
+| 00 | [00-overview.md](00-overview.md) | This file. Map of the documentation set. |
+| 01 | [01-architecture.md](01-architecture.md) | High-level architecture, agent loop, request lifecycle |
+| 02 | [02-modules.md](02-modules.md) | Module reference — every top-level package and file |
+| 03 | [03-tools.md](03-tools.md) | Tool registry, builtin tools, terminal backends, skills (overview) |
+| 04 | [04-gateway.md](04-gateway.md) | Messaging gateway, platform adapters, sessions |
+| 05 | [05-state-and-memory.md](05-state-and-memory.md) | SQLite session store, memory, skills, context engine, curator |
+| 06 | [06-providers.md](06-providers.md) | Provider transports, adapters, credentials, rate limits, billing |
+| 07 | [07-developer-guide.md](07-developer-guide.md) | Build, test, contribute, release |
+| 08 | [08-cli-reference.md](08-cli-reference.md) | Every CLI subcommand, every slash command, keybindings, autocomplete |
+| 09 | [09-skills-system.md](09-skills-system.md) | Skill format, index, Hub, guard, sync, curator (deep dive) |
+| 10 | [10-batch-and-rl.md](10-batch-and-rl.md) | Batch runner, trajectory compressor, mini SWE runner, Atropos envs |
+| 11 | [11-mcp-and-acp.md](11-mcp-and-acp.md) | MCP client + server, ACP server, comparison |
+| 12 | [12-tui-and-dashboard.md](12-tui-and-dashboard.md) | Ink TUI, `tui_gateway`, web dashboard, PTY bridge |
+| 13 | [13-security.md](13-security.md) | Threat model, approvals, path safety, prompt-injection scanning, redaction |
+| 14 | [14-configuration-reference.md](14-configuration-reference.md) | Complete `config.yaml` and `.env` reference |
+| 15 | [15-data-flow.md](15-data-flow.md) | ASCII sequence diagrams for the most common flows |
+| 16 | [16-extension-recipes.md](16-extension-recipes.md) | 25 cookbook recipes (new tool, new provider, new platform, etc.) |
+| 17 | [17-glossary-and-troubleshooting.md](17-glossary-and-troubleshooting.md) | Terminology + common failure modes + quick locate index |
+| 18 | [18-platforms-deep-dive.md](18-platforms-deep-dive.md) | Per-platform reference for all 22 adapters |
+| 19 | [19-testing-and-observability.md](19-testing-and-observability.md) | Test infrastructure, test categories, metrics, logging, tracing |
 
 ## What is Hermes Agent?
 
@@ -102,18 +115,53 @@ profiles share a common parent).
 
 ## How To Read This Documentation
 
-If you want to **understand the codebase**, read the documents in order:
-overview → architecture → modules → subsystem-specific docs.
+Read in numerical order if you are new to the codebase: 00 → 01 → 02 →
+… 19. Most documents stand alone, but the architecture and module-reference
+chapters provide the vocabulary the rest of the docs use.
 
-If you want to **contribute a new tool**, jump to
-[03-tools.md](03-tools.md) and the section on `tools/registry.py`.
+If you are diving into a specific subsystem:
 
-If you want to **add a messaging platform**, read
-[04-gateway.md](04-gateway.md) and the on-disk
-`gateway/platforms/ADDING_A_PLATFORM.md`.
+* **Adding a tool** → [03-tools.md](03-tools.md), [16-extension-recipes.md](16-extension-recipes.md) (Recipe 1).
+* **Adding a provider** → [06-providers.md](06-providers.md), [16-extension-recipes.md](16-extension-recipes.md) (Recipes 2-3).
+* **Adding a platform** → [04-gateway.md](04-gateway.md), [18-platforms-deep-dive.md](18-platforms-deep-dive.md), [16-extension-recipes.md](16-extension-recipes.md) (Recipe 4).
+* **Memory provider / context engine** → [05-state-and-memory.md](05-state-and-memory.md), [16-extension-recipes.md](16-extension-recipes.md) (Recipes 5-6).
+* **CLI / slash command work** → [08-cli-reference.md](08-cli-reference.md), [16-extension-recipes.md](16-extension-recipes.md) (Recipe 9).
+* **Cron / scheduling** → [04-gateway.md](04-gateway.md) §9, [16-extension-recipes.md](16-extension-recipes.md) (Recipe 10).
+* **MCP server work (client or server)** → [11-mcp-and-acp.md](11-mcp-and-acp.md).
+* **Editor integration via ACP** → [11-mcp-and-acp.md](11-mcp-and-acp.md), [12-tui-and-dashboard.md](12-tui-and-dashboard.md).
+* **Trajectory pipelines** → [10-batch-and-rl.md](10-batch-and-rl.md).
+* **Diagnosing a problem** → [17-glossary-and-troubleshooting.md](17-glossary-and-troubleshooting.md).
+* **Test / CI / metrics work** → [19-testing-and-observability.md](19-testing-and-observability.md).
+* **Auditing security** → [13-security.md](13-security.md).
+* **Anything else** → [02-modules.md](02-modules.md) is the index; jump
+  from the relevant package or file.
 
-If you want to **add a model provider**, read the "Transports & Adapters"
-chapter in [06-providers.md](06-providers.md).
+## Conventions used in this documentation
 
-If you want to **build a memory provider** or a context engine, read
-[05-state-and-memory.md](05-state-and-memory.md).
+* **Path references** use the form `<package>/<file>.py:<line>` (e.g.
+  `tools/registry.py:143`). Lines were correct at the time of
+  generation; large refactors may shift them.
+* **Code samples** are illustrative rather than copy-pastable unless
+  marked otherwise. They reflect the project's style (no top-level
+  comments, prefer dataclasses, all tool handlers return JSON strings).
+* **CLI samples** assume the user has activated the venv (or is using
+  the `./hermes` wrapper).
+* **Diagrams** are ASCII so they render in any viewer including
+  terminal `less`.
+
+## Document size
+
+This documentation set is intentionally large — it is meant to be a
+*reference* you grep, not a tutorial you read end-to-end. The full
+set covers ~10 000 lines across 20 files. If you only have time for
+one chapter, read [01-architecture.md](01-architecture.md). If you
+only need a quick reminder of where something lives, jump straight to
+[17-glossary-and-troubleshooting.md](17-glossary-and-troubleshooting.md)
+("Quick locate index" at the end).
+
+## Feedback
+
+Found something wrong, out of date, or missing? Open an issue or PR
+on GitHub. Contributors welcome — the entire technical doc set lives
+under `docs/technical/` and is plain Markdown.
+
