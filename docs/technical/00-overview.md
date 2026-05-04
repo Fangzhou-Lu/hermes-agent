@@ -31,6 +31,10 @@ plugin authors and anyone integrating with or extending the codebase.
 | 17 | [17-glossary-and-troubleshooting.md](17-glossary-and-troubleshooting.md) | Terminology + common failure modes + quick locate index |
 | 18 | [18-platforms-deep-dive.md](18-platforms-deep-dive.md) | Per-platform reference for all 22 adapters |
 | 19 | [19-testing-and-observability.md](19-testing-and-observability.md) | Test infrastructure, test categories, metrics, logging, tracing |
+| 20 | [20-voice-and-image.md](20-voice-and-image.md) | Voice mode (STT/TTS/coordination) and image generation pipeline |
+| 21 | [21-browser-tools.md](21-browser-tools.md) | Browser tools, CDP, providers, anti-bot, lifecycle |
+| 22 | [22-delegation-and-subagents.md](22-delegation-and-subagents.md) | Delegation, mixture of agents, clarify, sub-agent observability |
+| zh | [README-zh.md](README-zh.md) | 中文导航索引 |
 
 ## What is Hermes Agent?
 
