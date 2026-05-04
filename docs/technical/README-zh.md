@@ -33,6 +33,9 @@
 | 20 | [20-voice-and-image.md](20-voice-and-image.md) | 语音模式、TTS、STT、图像生成流水线 |
 | 21 | [21-browser-tools.md](21-browser-tools.md) | 浏览器工具家族、CDP、Provider 抽象、反爬 |
 | 22 | [22-delegation-and-subagents.md](22-delegation-and-subagents.md) | 委派、子 Agent、MoA、Clarify、并行性 |
+| 23 | [23-patterns-and-antipatterns.md](23-patterns-and-antipatterns.md) | 代码模式与反模式合集(reviewer 检查清单) |
+| 24 | [24-adapters-deep-dive.md](24-adapters-deep-dive.md) | Anthropic / Codex / Bedrock / Gemini / Copilot 等 Adapter 逐项细节 |
+| 25 | [25-fakes-and-test-harness.md](25-fakes-and-test-harness.md) | `tests/fakes/` 用法与 fixture 组合模式 |
 
 ## 按使用场景索引
 

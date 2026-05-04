@@ -34,6 +34,9 @@ plugin authors and anyone integrating with or extending the codebase.
 | 20 | [20-voice-and-image.md](20-voice-and-image.md) | Voice mode (STT/TTS/coordination) and image generation pipeline |
 | 21 | [21-browser-tools.md](21-browser-tools.md) | Browser tools, CDP, providers, anti-bot, lifecycle |
 | 22 | [22-delegation-and-subagents.md](22-delegation-and-subagents.md) | Delegation, mixture of agents, clarify, sub-agent observability |
+| 23 | [23-patterns-and-antipatterns.md](23-patterns-and-antipatterns.md) | Coding patterns / anti-patterns the codebase enforces |
+| 24 | [24-adapters-deep-dive.md](24-adapters-deep-dive.md) | Per-adapter (Anthropic / Codex / Bedrock / Gemini / …) deep dive |
+| 25 | [25-fakes-and-test-harness.md](25-fakes-and-test-harness.md) | `tests/fakes/` manual + fixture composition patterns |
 | zh | [README-zh.md](README-zh.md) | 中文导航索引 |
 
 ## What is Hermes Agent?
